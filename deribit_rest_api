@@ -1,0 +1,29 @@
+import requests
+import json
+
+ROOT_URL = 'https://www.deribit.com/api/v2'
+
+def get_instrument_list(currency, kind):
+    ''' gets a list of active instruments for the specified currency and kind 
+        example:  currency = btc and kind = option 
+        returns list of tuples with the contract name + expiration timestamp '''
+    url = ROOT_URL + '/public/get_instruments'
+    headers = {
+        'Content-Type': 'application/json',
+    }
+    params = {
+        'currency': currency,
+        'kind': kind
+    }
+    response = requests.get(url, params=params, headers=headers)
+    result = response.json()
+    result = result['result']
+    instrument_list = [(item['instrument_name'], item['expiration_timestamp']) for item in result]
+    return instrument_list
+
+def get_current_tob(instrument_name):
+    ''' uses /public/ticker to get current tob bid/ask + index price
+    '''
+
+i_list = get_instrument_list('btc', 'future')
+print(i_list)
