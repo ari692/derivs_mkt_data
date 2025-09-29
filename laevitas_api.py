@@ -16,7 +16,7 @@ def get_funding_for_ccy(api_key, ccy):
     url = f'{ROOT_URL}/analytics/futures/perpetual_funding/{ccy.upper()}'
     print(ROOT_URL)
     headers = {
-        'apikey': config['laevitas-api-key'],
+        'apikey': api_key,
     }
     try:
         response = requests.get(url, headers=headers)
@@ -28,7 +28,7 @@ def get_funding_for_ccy(api_key, ccy):
         }
     return {
         'success': True,
-        'error': result
+        'data': result
     }
 
 # config = read_json_file('config.json')
