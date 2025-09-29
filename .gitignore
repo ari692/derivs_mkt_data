@@ -1,6 +1,8 @@
 # configuration & local data
 config.json
 
+# mac file
+.DS_Store
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
