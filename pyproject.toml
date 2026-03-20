@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "derivs-options"
+version = "0.1.0"
+description = "Option construction and generalized Black-Scholes-Merton pricing utilities."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools]
+packages = ["derivs_options"]
