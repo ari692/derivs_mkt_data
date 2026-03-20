@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from option_pricing import option_price
+from option_pricing import option_greeks
 
 
 def make_option_dict(
@@ -83,7 +83,7 @@ if __name__ == "__main__":
         payout_type="standard",
         expiration=datetime(2026, 12, 26, tzinfo=timezone.utc),
     )
-    xyz_price_today = option_price(
+    xyz_stats_today = option_greeks(
         option=xyz_option,
         underlying_price=50.0,
         r=0.0,
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     )
 
     print(xyz_option)
-    print(f"XYZ option price today: {xyz_price_today:.6f}")
+    print(f"XYZ option stats today: {xyz_stats_today}")
 
     xyz_option_atm_100 = make_option_dict(
         symbol="XYZ",
@@ -103,7 +103,7 @@ if __name__ == "__main__":
         payout_type="standard",
         expiration=datetime(2026, 12, 26, tzinfo=timezone.utc),
     )
-    xyz_price_strike_100_spot_100 = option_price(
+    xyz_stats_strike_100_spot_100 = option_greeks(
         option=xyz_option_atm_100,
         underlying_price=100.0,
         r=0.0,
@@ -114,6 +114,19 @@ if __name__ == "__main__":
 
     print(xyz_option_atm_100)
     print(
-        "XYZ option price today (strike=100, spot/underlying=100): "
-        f"{xyz_price_strike_100_spot_100:.6f}"
+        "XYZ option stats today (strike=100, spot/underlying=100): "
+        f"{xyz_stats_strike_100_spot_100}"
+    )
+
+    xyz_stats_strike_100_spot_100_vol_21 = option_greeks(
+        option=xyz_option_atm_100,
+        underlying_price=100.0,
+        r=0.0,
+        b=0.0,
+        volatility=0.21,
+        valuation_datetime=datetime.now(timezone.utc),
+    )
+    print(
+        "XYZ option stats today (strike=100, spot/underlying=100, vol=21%): "
+        f"{xyz_stats_strike_100_spot_100_vol_21}"
     )

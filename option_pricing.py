@@ -20,24 +20,16 @@ def _to_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def option_price(
+def _prepare_bsm_terms(
     option: dict[str, Any],
     underlying_price: float | Decimal,
     r: float,
     b: float,
     volatility: float,
     valuation_datetime: datetime | None = None,
-) -> float:
-    """Price a European option using the generalized Black-Scholes-Merton model.
-
-    Formula (Garman-Kohlhagen style carry adjustment):
-      Call = S*exp((b-r)T)*N(d1) - K*exp(-rT)*N(d2)
-      Put  = K*exp(-rT)*N(-d2) - S*exp((b-r)T)*N(-d1)
-      d1   = [ln(S/K) + (b + 0.5*sigma^2)T] / [sigma*sqrt(T)]
-      d2   = d1 - sigma*sqrt(T)
-    """
+) -> tuple[float, float, float, float, float, float]:
     if option.get("exercise_style") != "european":
-        raise ValueError("option_price supports only european exercise_style.")
+        raise ValueError("Pricing supports only european exercise_style.")
     if option.get("option_type") not in {"call", "put"}:
         raise ValueError("option['option_type'] must be 'call' or 'put'.")
     if volatility <= 0.0:
@@ -68,9 +60,115 @@ def option_price(
     ) / sigma_sqrt_t
     d2 = d1 - sigma_sqrt_t
 
-    discounted_spot = s * math.exp((b - r) * time_to_expiry)
+    return s, k, time_to_expiry, d1, d2, math.exp((b - r) * time_to_expiry)
+
+
+def option_price(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Price a European option using the generalized Black-Scholes-Merton model.
+
+    Formula (Garman-Kohlhagen style carry adjustment):
+      Call = S*exp((b-r)T)*N(d1) - K*exp(-rT)*N(d2)
+      Put  = K*exp(-rT)*N(-d2) - S*exp((b-r)T)*N(-d1)
+      d1   = [ln(S/K) + (b + 0.5*sigma^2)T] / [sigma*sqrt(T)]
+      d2   = d1 - sigma*sqrt(T)
+    """
+    s, k, time_to_expiry, d1, d2, carry_discount = _prepare_bsm_terms(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    discounted_spot = s * carry_discount
     discounted_strike = k * math.exp(-r * time_to_expiry)
 
     if option["option_type"] == "call":
         return discounted_spot * normal_cdf(d1) - discounted_strike * normal_cdf(d2)
     return discounted_strike * normal_cdf(-d2) - discounted_spot * normal_cdf(-d1)
+
+
+def option_delta(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Generalized BSM delta for European calls/puts."""
+    _, _, _, d1, _, carry_discount = _prepare_bsm_terms(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    if option["option_type"] == "call":
+        return carry_discount * normal_cdf(d1)
+    return carry_discount * (normal_cdf(d1) - 1.0)
+
+
+def option_vega(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Generalized BSM vega for European calls/puts."""
+    s, _, time_to_expiry, d1, _, carry_discount = _prepare_bsm_terms(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    return s * carry_discount * normal_pdf(d1) * math.sqrt(time_to_expiry)
+
+
+def option_greeks(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> dict[str, float]:
+    """Return price, delta, and vega in one call."""
+    return {
+        "price": option_price(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+        "delta": option_delta(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+        "vega": option_vega(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+    }
