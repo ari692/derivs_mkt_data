@@ -130,6 +130,112 @@ def option_vega(
     return s * carry_discount * normal_pdf(d1) * math.sqrt(time_to_expiry)
 
 
+def option_rho(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Generalized BSM rho per +1.00 absolute move in rate."""
+    s, k, time_to_expiry, d1, d2, carry_discount = _prepare_bsm_terms(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    discounted_spot = s * carry_discount
+    discounted_strike = k * math.exp(-r * time_to_expiry)
+
+    if option["option_type"] == "call":
+        return time_to_expiry * (
+            discounted_strike * normal_cdf(d2) - discounted_spot * normal_cdf(d1)
+        )
+    return time_to_expiry * (
+        discounted_spot * normal_cdf(-d1) - discounted_strike * normal_cdf(-d2)
+    )
+
+
+def option_theta(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Generalized BSM theta per +1.00 day in calendar time."""
+    s, k, time_to_expiry, d1, d2, carry_discount = _prepare_bsm_terms(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    discounted_spot = s * carry_discount
+    discounted_strike = k * math.exp(-r * time_to_expiry)
+    front = -discounted_spot * normal_pdf(d1) * volatility / (2.0 * math.sqrt(time_to_expiry))
+
+    if option["option_type"] == "call":
+        theta_per_year = (
+            front
+            - (b - r) * discounted_spot * normal_cdf(d1)
+            - r * discounted_strike * normal_cdf(d2)
+        )
+    else:
+        theta_per_year = (
+            front
+            + (b - r) * discounted_spot * normal_cdf(-d1)
+            + r * discounted_strike * normal_cdf(-d2)
+        )
+    return theta_per_year / 365.0
+
+
+def option_gamma(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Generalized BSM gamma per $1 move in underlying."""
+    s, _, time_to_expiry, d1, _, carry_discount = _prepare_bsm_terms(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    return carry_discount * normal_pdf(d1) / (s * volatility * math.sqrt(time_to_expiry))
+
+
+def option_gamma_1pct(
+    option: dict[str, Any],
+    underlying_price: float | Decimal,
+    r: float,
+    b: float,
+    volatility: float,
+    valuation_datetime: datetime | None = None,
+) -> float:
+    """Approximate delta change for a 1% move in underlying."""
+    s = float(underlying_price)
+    gamma_per_1 = option_gamma(
+        option=option,
+        underlying_price=underlying_price,
+        r=r,
+        b=b,
+        volatility=volatility,
+        valuation_datetime=valuation_datetime,
+    )
+    return gamma_per_1 * s * 0.01
+
+
 def option_greeks(
     option: dict[str, Any],
     underlying_price: float | Decimal,
@@ -138,7 +244,7 @@ def option_greeks(
     volatility: float,
     valuation_datetime: datetime | None = None,
 ) -> dict[str, float]:
-    """Return price, delta, and vega in one call."""
+    """Return price and Greeks in one call."""
     return {
         "price": option_price(
             option=option,
@@ -157,6 +263,38 @@ def option_greeks(
             valuation_datetime=valuation_datetime,
         ),
         "vega": option_vega(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+        "rho": option_rho(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+        "theta": option_theta(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+        "gamma": option_gamma(
+            option=option,
+            underlying_price=underlying_price,
+            r=r,
+            b=b,
+            volatility=volatility,
+            valuation_datetime=valuation_datetime,
+        ),
+        "gammaP": option_gamma_1pct(
             option=option,
             underlying_price=underlying_price,
             r=r,
